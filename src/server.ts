@@ -64,9 +64,9 @@ export class FigmaMcpServer {
       async ({ fileKey, nodeId, depth }) => {
         try {
           Logger.log(
-            `Fetching ${
-              depth ? `${depth} layers deep` : "all layers"
-            } of ${nodeId ? `node ${nodeId} from file` : `full file`} ${fileKey}`,
+            Fetching ${
+              depth ? ${depth} layers deep : "all layers"
+            } of ${nodeId ? node ${nodeId} from file : full file} ${fileKey},
           );
 
           let file: SimplifiedDesign;
@@ -76,7 +76,7 @@ export class FigmaMcpServer {
             file = await this.figmaService.getFile(fileKey, depth);
           }
 
-          Logger.log(`Successfully fetched file: ${file.name}`);
+          Logger.log(Successfully fetched file: ${file.name});
           const { nodes, globalVars, ...metadata } = file;
 
           const result = {
@@ -94,10 +94,10 @@ export class FigmaMcpServer {
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : JSON.stringify(error);
-          Logger.error(`Error fetching file ${fileKey}:`, message);
+          Logger.error(Error fetching file ${fileKey}:, message);
           return {
             isError: true,
-            content: [{ type: "text", text: `Error fetching file: ${message}` }],
+            content: [{ type: "text", text: Error fetching file: ${message} }],
           };
         }
       },
@@ -161,16 +161,16 @@ export class FigmaMcpServer {
               {
                 type: "text",
                 text: saveSuccess
-                  ? `Success, ${downloads.length} images downloaded: ${downloads.join(", ")}`
+                  ? Success, ${downloads.length} images downloaded: ${downloads.join(", ")}
                   : "Failed",
               },
             ],
           };
         } catch (error) {
-          Logger.error(`Error downloading images from file ${fileKey}:`, error);
+          Logger.error(Error downloading images from file ${fileKey}:, error);
           return {
             isError: true,
-            content: [{ type: "text", text: `Error downloading images: ${error}` }],
+            content: [{ type: "text", text: Error downloading images: ${error} }],
           };
         }
       },
@@ -217,7 +217,7 @@ export class FigmaMcpServer {
         "/messages",
         res as unknown as ServerResponse<IncomingMessage>,
       );
-      console.log(`New SSE connection established for sessionId ${transport.sessionId}`);
+      console.log(New SSE connection established for sessionId ${transport.sessionId});
 
       this.transports[transport.sessionId] = transport;
       res.on("close", () => {
@@ -230,10 +230,10 @@ export class FigmaMcpServer {
     app.post("/messages", async (req: Request, res: Response) => {
       const sessionId = req.query.sessionId as string;
       if (!this.transports[sessionId]) {
-        res.status(400).send(`No transport found for sessionId ${sessionId}`);
+        res.status(400).send(No transport found for sessionId ${sessionId});
         return;
       }
-      console.log(`Received message for sessionId ${sessionId}`);
+      console.log(Received message for sessionId ${sessionId});
       await this.transports[sessionId].handlePostMessage(req, res);
     });
 
@@ -241,9 +241,9 @@ export class FigmaMcpServer {
     Logger.error = console.error;
 
     this.httpServer = app.listen(port, () => {
-      Logger.log(`HTTP server listening on port ${port}`);
-      Logger.log(`SSE endpoint available at http://localhost:${port}/sse`);
-      Logger.log(`Message endpoint available at http://localhost:${port}/messages`);
+      Logger.log(HTTP server listening on port ${port});
+      Logger.log(SSE endpoint available at http://localhost:${port}/sse);
+      Logger.log(Message endpoint available at http://localhost:${port}/messages);
     });
   }
 
