@@ -9,6 +9,8 @@ import { FigmaMcpServer } from "./server.js";
 // ✅ Load .env file from working directory
 loadEnv({ path: resolve(process.cwd(), ".env") });
 
+console.log("💡 MCP CLI 시작됨");
+
 export async function startServer(): Promise<void> {
   // ✅ Check CLI vs HTTP
   const isStdioMode = process.env.NODE_ENV === "cli" || process.argv.includes("--stdio");
