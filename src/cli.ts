@@ -1,36 +1,39 @@
 #!/usr/bin/env node
 
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { config } from "dotenv";
+import { config as loadEnv } from "dotenv"; // ✅ dotenv 이름 충돌 방지
 import { resolve } from "path";
 import { getServerConfig } from "./config.js";
 import { FigmaMcpServer } from "./server.js";
 
-// Load .env from the current working directory
-config({ path: resolve(process.cwd(), ".env") });
+// ✅ Load .env file from working directory
+loadEnv({ path: resolve(process.cwd(), ".env") });
 
 export async function startServer(): Promise<void> {
-  // Check if we're running in stdio mode (e.g., via CLI)
+  // ✅ Check CLI vs HTTP
   const isStdioMode = process.env.NODE_ENV === "cli" || process.argv.includes("--stdio");
 
-  const config = getServerConfig(isStdioMode);
-
-  const server = new FigmaMcpServer(config.figmaApiKey);
+  // ✅ getServerConfig safely (no variable shadowing)
+  const serverConfig = getServerConfig(isStdioMode);
+  const server = new FigmaMcpServer(serverConfig.figmaApiKey);
 
   if (isStdioMode) {
     const transport = new StdioServerTransport();
     await server.connect(transport);
   } else {
-    const port = Number(process.env.PORT) || config.port || 3333;
-    console.log(`Initializing Figma MCP Server in HTTP mode on port ${port}...`);
+    const port = Number(process.env.PORT) || serverConfig.port || 3333;
+
+    // ✅ 템플릿 리터럴 동작 확인용 로그
+    console.log(`🟢 Initializing Figma MCP Server on port ${port}`);
+    console.log(`🔑 FIGMA_API_KEY: ${serverConfig.figmaApiKey ? "[loaded]" : "[missing]"}`);
     await server.startHttpServer(port);
   }
 }
 
-// If we're being executed directly (not imported), start the server
-if (process.argv[1]) {
+// ✅ Execute directly
+if (process.argv[1] === new URL(import.meta.url).pathname) {
   startServer().catch((error) => {
-    console.error("Failed to start server:", error);
+    console.error("❌ Failed to start server:", error);
     process.exit(1);
   });
 }
