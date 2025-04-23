@@ -26,7 +26,9 @@ export async function startServer(): Promise<void> {
     // ✅ 템플릿 리터럴 동작 확인용 로그
     console.log(`🟢 Initializing Figma MCP Server on port ${port}`);
     console.log(`🔑 FIGMA_API_KEY: ${serverConfig.figmaApiKey ? "[loaded]" : "[missing]"}`);
+    console.log("🟢 호출 시작: startHttpServer()");
     await server.startHttpServer(port);
+    console.log("🟢 호출 완료: startHttpServer()");
   }
 }
 
