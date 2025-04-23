@@ -21,8 +21,9 @@ export async function startServer(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
   } else {
-    console.log(`Initializing Figma MCP Server in HTTP mode on port ${config.port}...`);
-    await server.startHttpServer(config.port);
+    const port = Number(process.env.PORT) || config.port || 3333;
+    console.log(`Initializing Figma MCP Server in HTTP mode on port ${port}...`);
+    await server.startHttpServer(port);
   }
 }
 
