@@ -33,9 +33,9 @@ export async function startServer(): Promise<void> {
 }
 
 // ✅ Execute directly
-if (process.argv[1] === new URL(import.meta.url).pathname) {
+
   startServer().catch((error) => {
     console.error("❌ Failed to start server:", error);
     process.exit(1);
   });
-}
+
