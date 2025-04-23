@@ -268,5 +268,3 @@ export class FigmaMcpServer {
     });
   }
 }
-
-이게 server.ts 구조야. openAI를 못찾겠다는데?
