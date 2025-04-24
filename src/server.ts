@@ -209,12 +209,12 @@ export class FigmaMcpServer {
   }
 
   async startHttpServer(port: number): Promise<void> {
+    const app = express();
     Logger.log("✅ app.listen() 호출 전");
     this.httpServer = app.listen(port, () => {
       Logger.log(`✅ HTTP server listening on port ${port}`);
     });
     
-    const app = express();
     app.use(cors());
     app.use(express.json());
     app.get("/sse", async (req: Request, res: Response) => {
