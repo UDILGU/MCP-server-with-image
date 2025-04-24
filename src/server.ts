@@ -159,7 +159,12 @@ if (!node) {
   target_text: targetText,
   context_summary: contextSummary,
   node_info: nodeInfo,
-  raw_node: node  // 🧩 전체 노드 구조 포함
+  raw_node: node,
+  position: node?.absoluteBoundingBox || {},
+  fills: node?.fills || [],
+  strokes: node?.strokes || [],
+  style: node?.style || {},
+  effects: node?.effects || []
 });
       } catch (e) {
         console.error("❌ /context 오류:", e);
