@@ -71,8 +71,8 @@ export class FigmaMcpServer {
 
   async connect(transport: Transport): Promise<void> {
     await this.server.connect(transport);
-    Logger.log = console.log;
-    Logger.error = console.error;
+    Logger.log = () => {};
+    Logger.error = () => {};
   }
 
   async startHttpServer(port: number): Promise<void> {
@@ -139,7 +139,7 @@ export class FigmaMcpServer {
         });
 
         const node = figmaResponse.nodes?.[nodeId]?.document;
-console.log("🧩 Figma Node 원본:", JSON.stringify(node, null, 2));
+// console.log("🧩 Figma Node 원본:", JSON.stringify(node, null, 2));
 if (!node) {
   return res.status(404).json({ error: "Node not found in Figma response" });
 }
@@ -153,7 +153,15 @@ if (!node) {
         const texts = findText(node);
         const targetText = texts.join("\n");
         const nodeInfo = { path: [node?.name || "이름 없음"] };
-        const contextSummary = `이 노드는 ${node?.type} 타입이며 이름은 \"${node?.name}\"입니다. 자식 텍스트 노드 수: ${texts.length}`;
+        const contextSummary = `이 노드는 ${node?.type} 타입이며 이름은 "${node?.name}"입니다.
+` +
+  `텍스트: ${targetText.substring(0, 40)}...
+` +
+  `버튼 위치: ${JSON.stringify(node?.absoluteBoundingBox || {})}
+` +
+  `색상: ${JSON.stringify(node?.fills || [])}
+` +
+  `스타일: ${JSON.stringify(node?.style || {})}`;
 
         res.json({
   target_text: targetText,
