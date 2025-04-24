@@ -235,7 +235,20 @@ export class FigmaMcpServer {
       console.log(`Received message for sessionId ${sessionId}`);
       await this.transports[sessionId].handlePostMessage(req, res);
     });
+    app.post("/context", async (req: Request, res: Response) => {
+      const { figma_url, access_token } = req.body;
 
+      // URL 파싱
+      const fileKey = extractFileKey(figma_url);
+      const nodeId = extractNodeId(figma_url);
+
+      const result = await figmaService.getNode(fileKey, nodeId); // 또는 getFile
+      res.json({
+        target_text: result?.text,
+        context_summary: result?.contextSummary,
+        node_info: result?.nodeInfo,
+      });
+    });
     Logger.log = console.log;
     Logger.error = console.error;
 
