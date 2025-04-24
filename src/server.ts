@@ -207,58 +207,81 @@ export class FigmaMcpServer {
     Logger.log("Server connected and ready to process requests");
   }
 
-  async startHttpServer(port: number): Promise<void> {
-    const app = express();
-    app.use(express.json());
-    
-    app.get("/sse", async (req: Request, res: Response) => {
-      console.log("Establishing new SSE connection");
-      const transport = new SSEServerTransport(
-        "/messages",
-        res as unknown as ServerResponse<IncomingMessage>,
-      );
-      console.log(`New SSE connection established for sessionId ${transport.sessionId}`);
+async startHttpServer(port: number): Promise<void> {
+  const app = express();
+  app.use(express.json());
 
-      this.transports[transport.sessionId] = transport;
-      res.on("close", () => {
-        delete this.transports[transport.sessionId];
-      });
+  // 🔧 유틸 함수 추가
+  function extractFileKey(figmaUrl: string): string | null {
+    const match = figmaUrl.match(/\/(?:file|design)\/([a-zA-Z0-9]+)/);
+    return match ? match[1] : null;
+  }
 
-      await this.server.connect(transport);
+  function extractNodeId(figmaUrl: string): string | null {
+    const match = figmaUrl.match(/node-id=([a-zA-Z0-9%:\-]+)/);
+    return match ? match[1] : null;
+  }
+
+  app.get("/sse", async (req: Request, res: Response) => {
+    console.log("Establishing new SSE connection");
+    const transport = new SSEServerTransport(
+      "/messages",
+      res as unknown as ServerResponse<IncomingMessage>
+    );
+    console.log(`New SSE connection established for sessionId ${transport.sessionId}`);
+
+    this.transports[transport.sessionId] = transport;
+    res.on("close", () => {
+      delete this.transports[transport.sessionId];
     });
 
-    app.post("/messages", async (req: Request, res: Response) => {
-      const sessionId = req.query.sessionId as string;
-      if (!this.transports[sessionId]) {
-        res.status(400).send(`No transport found for sessionId ${sessionId}`);
-        return;
-      }
-      console.log(`Received message for sessionId ${sessionId}`);
-      await this.transports[sessionId].handlePostMessage(req, res);
-    });
-    app.post("/context", async (req: Request, res: Response) => {
+    await this.server.connect(transport);
+  });
+
+  app.post("/messages", async (req: Request, res: Response) => {
+    const sessionId = req.query.sessionId as string;
+    if (!this.transports[sessionId]) {
+      res.status(400).send(`No transport found for sessionId ${sessionId}`);
+      return;
+    }
+    console.log(`Received message for sessionId ${sessionId}`);
+    await this.transports[sessionId].handlePostMessage(req, res);
+  });
+
+  // ✅ 새로 추가된 REST endpoint
+  app.post("/context", async (req: Request, res: Response) => {
+    try {
       const { figma_url, access_token } = req.body;
-
-      // URL 파싱
       const fileKey = extractFileKey(figma_url);
       const nodeId = extractNodeId(figma_url);
 
-      const result = await figmaService.getNode(fileKey, nodeId); // 또는 getFile
-      res.json({
-        target_text: result?.text,
-        context_summary: result?.contextSummary,
-        node_info: result?.nodeInfo,
-      });
-    });
-    Logger.log = console.log;
-    Logger.error = console.error;
+      if (!fileKey) {
+        return res.status(400).json({ error: "Invalid Figma URL" });
+      }
 
-    this.httpServer = app.listen(port, () => {
-      Logger.log(`HTTP server listening on port ${port}`);
-      Logger.log(`SSE endpoint available at http://localhost:${port}/sse`);
-      Logger.log(`Message endpoint available at http://localhost:${port}/messages`);
-    });
-  }
+      const result = await this.figmaService.getNode(fileKey, nodeId); // MCP 기반 구조
+      res.json({
+        target_text: result?.text || "",
+        context_summary: result?.contextSummary || "",
+        node_info: result?.nodeInfo || {}
+      });
+    } catch (e) {
+      Logger.error("Error in /context:", e);
+      res.status(500).json({ error: "Internal server error", detail: e?.message });
+    }
+  });
+
+  Logger.log = console.log;
+  Logger.error = console.error;
+
+  this.httpServer = app.listen(port, () => {
+    Logger.log(`HTTP server listening on port ${port}`);
+    Logger.log(`SSE endpoint available at http://localhost:${port}/sse`);
+    Logger.log(`Message endpoint available at http://localhost:${port}/messages`);
+    Logger.log(`Context REST endpoint at http://localhost:${port}/context`);
+  });
+}
+
 
   async stopHttpServer(): Promise<void> {
     if (!this.httpServer) {
