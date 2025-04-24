@@ -136,7 +136,11 @@ export class FigmaMcpServer {
           req.end();
         });
 
-        const node = figmaResponse.nodes[nodeId]?.document;
+        const node = figmaResponse.nodes?.[nodeId]?.document;
+console.log("🧩 Figma Node 원본:", JSON.stringify(node, null, 2));
+if (!node) {
+  return res.status(404).json({ error: "Node not found in Figma response" });
+}
 
         function findText(n: any): string[] {
           if (n.type === "TEXT" && n.characters) return [n.characters];
