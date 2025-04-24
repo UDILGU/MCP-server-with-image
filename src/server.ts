@@ -163,12 +163,25 @@ if (!node) {
 ` +
   `스타일: ${JSON.stringify(node?.style || {})}`;
 
-        res.json({
+        function findFirstPosition(n: any): any {
+  if (n.absoluteBoundingBox) return n.absoluteBoundingBox;
+  if (n.children) {
+    for (const child of n.children) {
+      const found = findFirstPosition(child);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+const position = node?.absoluteBoundingBox || findFirstPosition(node) || {};
+
+res.json({
   target_text: targetText,
   context_summary: contextSummary,
   node_info: nodeInfo,
   raw_node: node,
-  position: node?.absoluteBoundingBox || {},
+  position: position,
   fills: node?.fills || [],
   strokes: node?.strokes || [],
   style: node?.style || {},
