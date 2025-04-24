@@ -231,6 +231,8 @@ async startHttpServer(port: number): Promise<void> {
 
   app.post("/evaluate", async (req: Request, res: Response) => {
     const { fileKey, nodeId, label } = req.body;
+    
+    Logger.log("📥 /evaluate 요청 도착:", { fileKey, nodeId, label });
 
     try {
       const node = await this.figmaService.getNode(fileKey, nodeId);
@@ -250,6 +252,7 @@ UX Writing 관점에서 이 텍스트는 적절한가요?
       const result = await callOpenAI(prompt);
       res.json({ reply: result });
     } catch (err) {
+      Logger.error("❌ /evaluate 처리 중 에러:", err);
       res.status(500).json({ error: "MCP 서버 GPT 처리 중 오류", detail: err });
     }
   });
