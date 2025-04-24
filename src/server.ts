@@ -209,94 +209,68 @@ export class FigmaMcpServer {
   }
 
   async startHttpServer(port: number): Promise<void> {
-    const app = express();
-    Logger.log("✅ app.listen() 호출 전");
-    this.httpServer = app.listen(port, () => {
-      Logger.log(`✅ HTTP server listening on port ${port}`);
-    });
-    
-    app.use(cors());
-    app.use(express.json());
-    app.get("/sse", async (req: Request, res: Response) => {
-      console.log("Establishing new SSE connection");
-      const transport = new SSEServerTransport(
-        "/messages",
-        res as unknown as ServerResponse<IncomingMessage>,
-      );
-      console.log(`New SSE connection established for sessionId ${transport.sessionId}`);
+  const app = express();
+  app.use(cors());
+  app.use(express.json());
 
-      this.transports[transport.sessionId] = transport;
-      res.on("close", () => {
-        delete this.transports[transport.sessionId];
-      });
+  app.get("/sse", async (req: Request, res: Response) => {
+    console.log("Establishing new SSE connection");
+    const transport = new SSEServerTransport(
+      "/messages",
+      res as unknown as ServerResponse<IncomingMessage>,
+    );
+    console.log(`New SSE connection established for sessionId ${transport.sessionId}`);
 
-      await this.server.connect(transport);
+    this.transports[transport.sessionId] = transport;
+    res.on("close", () => {
+      delete this.transports[transport.sessionId];
     });
 
-    app.post("/evaluate", async (req: Request, res: Response) => {
-      const { fileKey, nodeId, label } = req.body;
-    
-      try {
-        const node = await this.figmaService.getNode(fileKey, nodeId);
-        const contextText = JSON.stringify(node, null, 2);
-    
-        const prompt = `
-    [Figma 문맥]
-    ${contextText}
-    
-    [텍스트]
-    "${label}"
-    
-    UX Writing 관점에서 이 텍스트는 적절한가요?
-    역할(버튼/헤더 등)에 맞는 표현인지, 개선점이 있다면 제안해주세요.
-    `;
-    
-        const result = await callOpenAI(prompt);
-        res.json({ reply: result });
-      } catch (err) {
-        res.status(500).json({ error: "MCP 서버 GPT 처리 중 오류", detail: err });
-      }
-    });
-    
-    app.post("/messages", async (req: Request, res: Response) => {
-      const sessionId = req.query.sessionId as string;
-      if (!this.transports[sessionId]) {
-        res.status(400).send(`No transport found for sessionId ${sessionId}`);
-        return;
-      }
-      console.log(`Received message for sessionId ${sessionId}`);
-      await this.transports[sessionId].handlePostMessage(req, res);
-    });
+    await this.server.connect(transport);
+  });
 
-    Logger.log = console.log;
-    Logger.error = console.error;
+  app.post("/evaluate", async (req: Request, res: Response) => {
+    const { fileKey, nodeId, label } = req.body;
 
-    this.httpServer = app.listen(port, () => {
-      Logger.log(`HTTP server listening on port ${port}`);
-      Logger.log(`SSE endpoint available at http://localhost:${port}/sse`);
-      Logger.log(`Message endpoint available at http://localhost:${port}/messages`);
-    });
-  }
+    try {
+      const node = await this.figmaService.getNode(fileKey, nodeId);
+      const contextText = JSON.stringify(node, null, 2);
 
-  async stopHttpServer(): Promise<void> {
-    if (!this.httpServer) {
-      throw new Error("HTTP server is not running");
+      const prompt = `
+[Figma 문맥]
+${contextText}
+
+[텍스트]
+"${label}"
+
+UX Writing 관점에서 이 텍스트는 적절한가요?
+역할(버튼/헤더 등)에 맞는 표현인지, 개선점이 있다면 제안해주세요.
+`;
+
+      const result = await callOpenAI(prompt);
+      res.json({ reply: result });
+    } catch (err) {
+      res.status(500).json({ error: "MCP 서버 GPT 처리 중 오류", detail: err });
     }
+  });
 
-    return new Promise((resolve, reject) => {
-      this.httpServer!.close((err: Error | undefined) => {
-        if (err) {
-          reject(err);
-          return;
-        }
-        this.httpServer = null;
-        const closing = Object.values(this.transports).map((transport) => {
-          return transport.close();
-        });
-        Promise.all(closing).then(() => {
-          resolve();
-        });
-      });
-    });
-  }
+  app.post("/messages", async (req: Request, res: Response) => {
+    const sessionId = req.query.sessionId as string;
+    if (!this.transports[sessionId]) {
+      res.status(400).send(`No transport found for sessionId ${sessionId}`);
+      return;
+    }
+    console.log(`Received message for sessionId ${sessionId}`);
+    await this.transports[sessionId].handlePostMessage(req, res);
+  });
+
+  Logger.log = console.log;
+  Logger.error = console.error;
+
+  // ✅ 이제 이거 하나만 남김!
+  this.httpServer = app.listen(port, () => {
+    Logger.log(`✅ HTTP server listening on port ${port}`);
+    Logger.log(`SSE endpoint available at http://localhost:${port}/sse`);
+    Logger.log(`Message endpoint available at http://localhost:${port}/messages`);
+  });
 }
