@@ -209,7 +209,8 @@ export class FigmaMcpServer {
 
   async startHttpServer(port: number): Promise<void> {
     const app = express();
-
+    app.use(express.json());
+    
     app.get("/sse", async (req: Request, res: Response) => {
       console.log("Establishing new SSE connection");
       const transport = new SSEServerTransport(
