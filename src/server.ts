@@ -184,18 +184,37 @@ const explanation = `이 오브젝트는 '${node?.name}'라는 이름을 가진 
 ` +
   `텍스트는 '${targetText.substring(0, 30)}...'이며, 시각 강조 스타일은 ${node?.style ? JSON.stringify(node.style) : "없음"}입니다.`;
 
+function buildHierarchy(node: any): any {
+  const simplified = {
+    name: node.name || "이름 없음",
+    type: node.type,
+    characters: node.characters || "",
+    position: node.absoluteBoundingBox || null,
+    fills: node.fills || [],
+    strokes: node.strokes || [],
+    style: node.style || {},
+    effects: node.effects || [],
+  };
+  if (node.children) {
+    simplified["children"] = node.children.map(buildHierarchy);
+  }
+  return simplified;
+}
+
+const hierarchy = buildHierarchy(node);
+
 res.json({
   name: node?.name || "이름 없음",
   target_text: targetText,
   context_summary: contextSummary,
   node_info: nodeInfo,
-  raw_node: node,
   position: position,
   fills: node?.fills || [],
   strokes: node?.strokes || [],
   style: node?.style || {},
   effects: node?.effects || [],
-  explanation: explanation
+  explanation: explanation,
+  hierarchy: hierarchy
 });
       } catch (e) {
         console.error("❌ /context 오류:", e);
