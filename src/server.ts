@@ -174,7 +174,8 @@ if (!node) {
   return null;
 }
 
-const position = node?.absoluteBoundingBox || findFirstPosition(node) || {};
+const resolvedPosition = node?.absoluteBoundingBox || findFirstPosition(node);
+const position = resolvedPosition || "❌ 위치 정보 없음";
 
 res.json({
   target_text: targetText,
