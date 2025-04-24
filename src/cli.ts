@@ -23,7 +23,7 @@ export async function startServer(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
   } else {
-    const port = Number(process.env.PORT) || serverConfig.port || 3333;
+    const port = Number(process.env.PORT) || 3333;
     console.log("🔍 포트 확인:", port); // 반드시 이게 찍혀야 함
     // ✅ 템플릿 리터럴 동작 확인용 로그
     console.log(`🟢 Initializing Figma MCP Server on port ${port}`);
