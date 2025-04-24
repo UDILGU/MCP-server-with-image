@@ -7,6 +7,7 @@ import { IncomingMessage, ServerResponse, Server } from "http";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { SimplifiedDesign } from "./services/simplify-node-response.js";
 import yaml from "js-yaml";
+import axios from "axios";
 
 export const Logger = {
   log: (...args: any[]) => { },
@@ -249,37 +250,63 @@ async startHttpServer(port: number): Promise<void> {
   });
 
   // ✅ 새로 추가된 REST endpoint
-  app.post("/context", async (req: Request, res: Response) => {
-    try {
-      const { figma_url, access_token } = req.body;
-      const fileKey = extractFileKey(figma_url);
-      const nodeId = extractNodeId(figma_url);
+app.post("/context", async (req: Request, res: Response) => {
+  try {
+    const { figma_url, access_token } = req.body;
 
-      if (!fileKey) {
-        return res.status(400).json({ error: "Invalid Figma URL" });
-      }
-
-      const result = await this.figmaService.getNode(fileKey, nodeId); // MCP 기반 구조
-      res.json({
-        target_text: result?.text || "",
-        context_summary: result?.contextSummary || "",
-        node_info: result?.nodeInfo || {}
-      });
-    } catch (e) {
-      Logger.error("Error in /context:", e);
-      res.status(500).json({ error: "Internal server error", detail: e?.message });
+    function extractFileKey(url: string): string | null {
+      const match = url.match(/\/(?:file|design)\/([a-zA-Z0-9]+)/);
+      return match ? match[1] : null;
     }
-  });
 
-  Logger.log = console.log;
-  Logger.error = console.error;
+    function extractNodeId(url: string): string | null {
+      const match = url.match(/node-id=([a-zA-Z0-9%:\-]+)/);
+      return match ? match[1] : null;
+    }
 
-  this.httpServer = app.listen(port, () => {
-    Logger.log(`HTTP server listening on port ${port}`);
-    Logger.log(`SSE endpoint available at http://localhost:${port}/sse`);
-    Logger.log(`Message endpoint available at http://localhost:${port}/messages`);
-    Logger.log(`Context REST endpoint at http://localhost:${port}/context`);
-  });
+    const fileKey = extractFileKey(figma_url);
+    const nodeId = extractNodeId(figma_url);
+
+    if (!fileKey || !nodeId) {
+      return res.status(400).json({ error: "Invalid Figma URL" });
+    }
+
+    // ✅ Figma API 직접 호출
+    const headers = {
+      "X-Figma-Token": access_token,
+    };
+    const url = `https://api.figma.com/v1/files/${fileKey}/nodes?ids=${nodeId}`;
+    const figmaResponse = await axios.get(url, { headers });
+    const node = figmaResponse.data.nodes[nodeId]?.document;
+
+    // ✅ 텍스트 추출 (재귀 포함)
+    function findText(n: any): string[] {
+      if (n.type === "TEXT" && n.characters) return [n.characters];
+      if (n.children) return n.children.flatMap(findText);
+      return [];
+    }
+
+    const texts = findText(node);
+    const targetText = texts.join("\n");
+
+    // ✅ 맥락 요약 및 경로
+    const nodeInfo = {
+      path: [node?.name || "이름 없음"],
+    };
+    const contextSummary = `이 노드는 ${node?.type} 타입이며 이름은 "${node?.name}"입니다. 자식 텍스트 노드 수: ${texts.length}`;
+
+    // ✅ 최종 응답
+    res.json({
+      target_text: targetText,
+      context_summary: contextSummary,
+      node_info: nodeInfo,
+    });
+
+  } catch (e) {
+    console.error("❌ /context 오류:", e);
+    res.status(500).json({ error: "Internal server error", detail: e?.message });
+  }
+});
 }
 
 
