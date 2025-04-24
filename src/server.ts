@@ -8,6 +8,7 @@ import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { SimplifiedDesign } from "./services/simplify-node-response.js";
 import yaml from "js-yaml";
 import cors from "cors";
+import { callOpenAI } from "./utils/openai.js";
 
 export const Logger = {
   log: (...args: any[]) => { },
