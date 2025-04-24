@@ -185,6 +185,7 @@ const explanation = `이 오브젝트는 '${node?.name}'라는 이름을 가진 
   `텍스트는 '${targetText.substring(0, 30)}...'이며, 시각 강조 스타일은 ${node?.style ? JSON.stringify(node.style) : "없음"}입니다.`;
 
 res.json({
+  name: node?.name || "이름 없음",
   target_text: targetText,
   context_summary: contextSummary,
   node_info: nodeInfo,
