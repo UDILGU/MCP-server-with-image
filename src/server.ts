@@ -177,6 +177,13 @@ if (!node) {
 const resolvedPosition = node?.absoluteBoundingBox || findFirstPosition(node);
 const position = resolvedPosition || "❌ 위치 정보 없음";
 
+const explanation = `이 오브젝트는 '${node?.name}'라는 이름을 가진 ${node?.type} 타입입니다.
+` +
+  `위치는 ${resolvedPosition ? `x: ${resolvedPosition.x}, y: ${resolvedPosition.y}` : "확인되지 않음"}이며, ` +
+  `배경 색상은 ${node?.fills?.[0]?.color ? JSON.stringify(node.fills[0].color) : "제공되지 않음"}입니다.
+` +
+  `텍스트는 '${targetText.substring(0, 30)}...'이며, 시각 강조 스타일은 ${node?.style ? JSON.stringify(node.style) : "없음"}입니다.`;
+
 res.json({
   target_text: targetText,
   context_summary: contextSummary,
@@ -186,7 +193,8 @@ res.json({
   fills: node?.fills || [],
   strokes: node?.strokes || [],
   style: node?.style || {},
-  effects: node?.effects || []
+  effects: node?.effects || [],
+  explanation: explanation
 });
       } catch (e) {
         console.error("❌ /context 오류:", e);
