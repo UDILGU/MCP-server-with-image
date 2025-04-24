@@ -108,8 +108,10 @@ export class FigmaMcpServer {
         }
 
         function extractNodeId(url: string): string | null {
-          const match = url.match(/node-id=([a-zA-Z0-9%:\-]+)/);
-          return match ? match[1] : null;
+  const match = url.match(/node-id=([a-zA-Z0-9%:\-]+)/);
+  if (!match) return null;
+  return match[1].replace("-", ":");
+
         }
 
         const fileKey = extractFileKey(figma_url);
