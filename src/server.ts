@@ -122,10 +122,12 @@ export class FigmaMcpServer {
         }
 
         const options = {
-          hostname: 'api.figma.com',
-          path: `/v1/files/${fileKey}/nodes?ids=${nodeId}`,
-          method: 'GET',
-          headers: { 'X-Figma-Token': access_token }
+  hostname: 'api.figma.com',
+  path: `/v1/files/${fileKey}/nodes?ids=${nodeId}`,
+  method: 'GET',
+  headers: {
+    'X-Figma-Token': access_token  // ✅ 사용자로부터 받은 토큰 사용
+  }
         };
 
         const figmaResponse: any = await new Promise((resolve, reject) => {
