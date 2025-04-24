@@ -23,7 +23,12 @@ export async function startServer(): Promise<void> {
     const transport = new StdioServerTransport();
     await server.connect(transport);
   } else {
-    const port = Number(process.env.PORT) || 3333;
+    const port = parseInt(process.env.PORT || "", 10);
+
+    if (Number.isNaN(port)) {
+      console.error("❌ process.env.PORT가 설정되어 있지 않음 (Render 환경에서는 필수)");
+      process.exit(1);
+    }
     console.log("🔍 포트 확인:", port); // 반드시 이게 찍혀야 함
     // ✅ 템플릿 리터럴 동작 확인용 로그
     console.log(`🟢 Initializing Figma MCP Server on port ${port}`);
