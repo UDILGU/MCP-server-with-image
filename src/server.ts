@@ -208,7 +208,7 @@ export class FigmaMcpServer {
     Logger.log("Server connected and ready to process requests");
   }
 
-  async startHttpServer(port: number): Promise<void> {
+async startHttpServer(port: number): Promise<void> {
   const app = express();
   app.use(cors());
   app.use(express.json());
@@ -267,7 +267,7 @@ UX Writing 관점에서 이 텍스트는 적절한가요?
   Logger.log = console.log;
   Logger.error = console.error;
 
-  // ✅ 이제 이거 하나만 남김!
+  // ✅ listen은 단 한 번만!
   this.httpServer = app.listen(port, () => {
     Logger.log(`✅ HTTP server listening on port ${port}`);
     Logger.log(`SSE endpoint available at http://localhost:${port}/sse`);
