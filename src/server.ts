@@ -156,10 +156,11 @@ if (!node) {
         const contextSummary = `이 노드는 ${node?.type} 타입이며 이름은 \"${node?.name}\"입니다. 자식 텍스트 노드 수: ${texts.length}`;
 
         res.json({
-          target_text: targetText,
-          context_summary: contextSummary,
-          node_info: nodeInfo,
-        });
+  target_text: targetText,
+  context_summary: contextSummary,
+  node_info: nodeInfo,
+  raw_node: node  // 🧩 전체 노드 구조 포함
+});
       } catch (e) {
         console.error("❌ /context 오류:", e);
         res.status(500).json({ error: "Internal server error", detail: e?.message });
