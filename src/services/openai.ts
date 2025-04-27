@@ -6,8 +6,8 @@ export async function analyzeImageWithOpenAIVision(imageUrl: string, openaiApiKe
       {
         role: "user",
         content: [
-          { type: "image_url", image_url: { url: imageUrl } }
-          { type: "text", text: "Describe this image. Focus on UI/UX, text, buttons, and visual elements." },
+          { type: "image_url", image_url: { url: imageUrl } },
+          { type: "text", text: "Describe this image. Focus on UI/UX, text, buttons, and visual elements." }
         ]
       }
     ],
