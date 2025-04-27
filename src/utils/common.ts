@@ -1,5 +1,5 @@
-import fs from "fs";
-import path from "path";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, createWriteStream } from "node:fs";
+import { join } from "node:path";
 
 import type { Paint, RGBA } from "@figma/rest-api-spec";
 import { CSSHexColor, CSSRGBAColor, SimplifiedFill } from "~/services/simplify-node-response.js";
@@ -41,9 +41,8 @@ export async function downloadFigmaImage(
     if (!response.ok) {
       throw new Error(`Failed to download image: ${response.statusText}`);
     }
-
     // Create write stream
-    const writer = fs.createWriteStream(fullPath);
+    const writer = createWriteStream(fullPath);
 
     // Get the response as a readable stream and pipe it to the file
     const reader = response.body?.getReader();
@@ -290,7 +289,7 @@ export function parsePaint(raw: Paint): SimplifiedFill {
     return {
       type: raw.type,
       gradientHandlePositions: raw.gradientHandlePositions,
-      gradientStops: raw.gradientStops.map(({ position, color }) => ({
+      gradientStops: raw.gradientStops.map(({ position, color }: { position: number; color: RGBA }) => ({
         position,
         color: convertColor(color),
       })),
@@ -307,4 +306,24 @@ export function parsePaint(raw: Paint): SimplifiedFill {
  */
 export function isVisible(element: { visible?: boolean }): boolean {
   return element.visible ?? true;
+}
+
+/**
+ * Recursively find all node IDs that have an image fill.
+ * @param node - Figma node
+ * @returns Array of node IDs with image fills
+ */
+export function findImageNodeIds(node: any): string[] {
+  let ids: string[] = [];
+  if (node.fills && Array.isArray(node.fills)) {
+    if (node.fills.some((fill: any) => fill.type === "IMAGE")) {
+      ids.push(node.id);
+    }
+  }
+  if (node.children && Array.isArray(node.children)) {
+    for (const child of node.children) {
+      ids = ids.concat(findImageNodeIds(child));
+    }
+  }
+  return ids;
 }

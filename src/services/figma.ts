@@ -8,7 +8,6 @@ import type {
 } from "@figma/rest-api-spec";
 import { downloadFigmaImage } from "~/utils/common.js";
 import { Logger } from "~/server.js";
-import yaml from "js-yaml";
 
 export interface FigmaError {
   status: number;
@@ -167,7 +166,6 @@ function writeLogs(name: string, value: any) {
     if (process.env.NODE_ENV !== "development") return;
 
     const logsDir = "logs";
-
     try {
       fs.accessSync(process.cwd(), fs.constants.W_OK);
     } catch (error) {
@@ -182,4 +180,23 @@ function writeLogs(name: string, value: any) {
   } catch (error) {
     console.debug("Failed to write logs:", error);
   }
+}
+
+/**
+ * Fetch image URLs for given node IDs from Figma API.
+ */
+export async function fetchImageUrls(
+  fileKey: string,
+  nodeIds: string[],
+  accessToken: string
+): Promise<Record<string, string>> {
+  if (!nodeIds.length) return {};
+  const idsParam = nodeIds.join(",");
+  const url = `https://api.figma.com/v1/images/${fileKey}?ids=${idsParam}&format=png`;
+  const response = await fetch(url, {
+    headers: { "X-Figma-Token": accessToken }
+  });
+  if (!response.ok) throw new Error("Failed to fetch image URLs from Figma API");
+  const data = await response.json();
+  return data.images || {};
 }

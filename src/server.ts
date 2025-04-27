@@ -6,8 +6,11 @@ import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { IncomingMessage, ServerResponse, Server } from "http";
 import { Transport } from "@modelcontextprotocol/sdk/shared/transport.js";
 import { SimplifiedDesign } from "./services/simplify-node-response.js";
-import yaml from "js-yaml";
-import https from "https";
+import * as yaml from "js-yaml";
+import * as https from "https";
+import { findImageNodeIds } from "./utils/common.js";
+import { fetchImageUrls } from "./services/figma.js";
+import { analyzeImageWithOpenAIVision } from "./services/openai.js";
 
 export const Logger = {
   log: (...args: any[]) => { },
@@ -47,7 +50,7 @@ export class FigmaMcpServer {
         nodeId: z.string().optional(),
         depth: z.number().optional(),
       },
-      async ({ fileKey, nodeId, depth }) => {
+      async ({ fileKey, nodeId, depth }: { fileKey: string, nodeId?: string, depth?: number }) => {
         try {
           let file: SimplifiedDesign;
           if (nodeId) {
@@ -100,7 +103,7 @@ export class FigmaMcpServer {
 
     app.post("/context", async (req: Request, res: Response) => {
       try {
-        const { figma_url, access_token } = req.body;
+        const { figma_url, access_token, openai_api_key } = req.body;
 
         function extractFileKey(url: string): string | null {
           const match = url.match(/\/(?:file|design)\/([a-zA-Z0-9]+)/);
@@ -108,10 +111,9 @@ export class FigmaMcpServer {
         }
 
         function extractNodeId(url: string): string | null {
-  const match = url.match(/node-id=([a-zA-Z0-9%:\-]+)/);
-  if (!match) return null;
-  return match[1].replace("-", ":");
-
+          const match = url.match(/node-id=([a-zA-Z0-9%:\-]+)/);
+          if (!match) return null;
+          return match[1].replace("-", ":");
         }
 
         const fileKey = extractFileKey(figma_url);
@@ -122,12 +124,12 @@ export class FigmaMcpServer {
         }
 
         const options = {
-  hostname: 'api.figma.com',
-  path: `/v1/files/${fileKey}/nodes?ids=${nodeId}`,
-  method: 'GET',
-  headers: {
-    'X-Figma-Token': access_token  // ✅ 사용자로부터 받은 토큰 사용
-  }
+          hostname: 'api.figma.com',
+          path: `/v1/files/${fileKey}/nodes?ids=${nodeId}`,
+          method: 'GET',
+          headers: {
+            'X-Figma-Token': access_token  // ✅ 사용자로부터 받은 토큰 사용
+          }
         };
 
         const figmaResponse: any = await new Promise((resolve, reject) => {
@@ -141,10 +143,15 @@ export class FigmaMcpServer {
         });
 
         const node = figmaResponse.nodes?.[nodeId]?.document;
-// console.log("🧩 Figma Node 원본:", JSON.stringify(node, null, 2));
-if (!node) {
-  return res.status(404).json({ error: "Node not found in Figma response" });
-}
+        if (!node) {
+          return res.status(404).json({ error: "Node not found in Figma response" });
+        }
+
+        // 1. 이미지 포함 노드 ID 수집
+        const imageNodeIds = findImageNodeIds(node);
+
+        // 2. Figma API로 실제 image_url 가져오기
+        const imageUrls = await fetchImageUrls(fileKey, imageNodeIds, access_token);
 
         function findText(n: any): string[] {
           if (n.type === "TEXT" && n.characters) return [n.characters];
@@ -157,68 +164,52 @@ if (!node) {
         const nodeInfo = { path: [node?.name || "이름 없음"] };
         const contextSummary = `이 노드는 ${node?.type} 타입이며 이름은 "${node?.name}"입니다.
 ` +
-  `텍스트: ${targetText.substring(0, 40)}...
+          `텍스트: ${targetText.substring(0, 40)}...
 ` +
-  `버튼 위치: ${JSON.stringify(node?.absoluteBoundingBox || {})}
+          `버튼 위치: ${JSON.stringify(node?.absoluteBoundingBox || {})}
 ` +
-  `색상: ${JSON.stringify(node?.fills || [])}
+          `색상: ${JSON.stringify(node?.fills || [])}
 ` +
-  `스타일: ${JSON.stringify(node?.style || {})}`;
+          `스타일: ${JSON.stringify(node?.style || {})}`;
 
         function findFirstPosition(n: any): any {
-  if (n.absoluteBoundingBox) return n.absoluteBoundingBox;
-  if (n.children) {
-    for (const child of n.children) {
-      const found = findFirstPosition(child);
-      if (found) return found;
-    }
-  }
-  return null;
-}
+          if (n.absoluteBoundingBox) return n.absoluteBoundingBox;
+          if (n.children) {
+            for (const child of n.children) {
+              const found = findFirstPosition(child);
+              if (found) return found;
+            }
+          }
+          return null;
+        }
 
-const resolvedPosition = node?.absoluteBoundingBox || findFirstPosition(node);
-const position = resolvedPosition || "❌ 위치 정보 없음";
+        const resolvedPosition = node?.absoluteBoundingBox || findFirstPosition(node);
+        const position = resolvedPosition || "❌ 위치 정보 없음";
 
-const explanation = `이 오브젝트는 '${node?.name}'라는 이름을 가진 ${node?.type} 타입입니다.
+        const explanation = `이 오브젝트는 '${node?.name}'라는 이름을 가진 ${node?.type} 타입입니다.
 ` +
-  `위치는 ${resolvedPosition ? `x: ${resolvedPosition.x}, y: ${resolvedPosition.y}` : "확인되지 않음"}이며, ` +
-  `배경 색상은 ${node?.fills?.[0]?.color ? JSON.stringify(node.fills[0].color) : "제공되지 않음"}입니다.
+          `위치는 ${resolvedPosition ? `x: ${resolvedPosition.x}, y: ${resolvedPosition.y}` : "확인되지 않음"}이며, ` +
+          `배경 색상은 ${node?.fills?.[0]?.color ? JSON.stringify(node.fills[0].color) : "제공되지 않음"}입니다.
 ` +
-  `텍스트는 '${targetText.substring(0, 30)}...'이며, 시각 강조 스타일은 ${node?.style ? JSON.stringify(node.style) : "없음"}입니다.`;
+          `텍스트는 '${targetText.substring(0, 30)}...'이며, 시각 강조 스타일은 ${node?.style ? JSON.stringify(node.style) : "없음"}입니다.`;
 
-function buildHierarchy(node: any): any {
-  const simplified = {
-    name: node.name || "이름 없음",
-    type: node.type,
-    characters: node.characters || "",
-    position: node.absoluteBoundingBox || null,
-    fills: node.fills || [],
-    strokes: node.strokes || [],
-    style: node.style || {},
-    effects: node.effects || [],
-  };
-  if (node.children) {
-    simplified["children"] = node.children.map(buildHierarchy);
-  }
-  return simplified;
-}
+        // 3. 계층 구조 생성 (이미지 URL 및 Vision 분석 포함)
+        const hierarchy = await buildHierarchy(node, imageUrls, openai_api_key);
 
-const hierarchy = buildHierarchy(node);
-
-res.json({
-  name: node?.name || "이름 없음",
-  target_text: targetText,
-  context_summary: contextSummary,
-  node_info: nodeInfo,
-  position: position,
-  fills: node?.fills || [],
-  strokes: node?.strokes || [],
-  style: node?.style || {},
-  effects: node?.effects || [],
-  explanation: explanation,
-  hierarchy: hierarchy
-});
-      } catch (e) {
+        res.json({
+          name: node?.name || "이름 없음",
+          target_text: targetText,
+          context_summary: contextSummary,
+          node_info: nodeInfo,
+          position: position,
+          fills: node?.fills || [],
+          strokes: node?.strokes || [],
+          style: node?.style || {},
+          effects: node?.effects || [],
+          explanation: explanation,
+          hierarchy: hierarchy
+        });
+      } catch (e: any) {
         console.error("❌ /context 오류:", e);
         res.status(500).json({ error: "Internal server error", detail: e?.message });
       }
@@ -241,4 +232,33 @@ res.json({
       });
     });
   }
+}
+
+async function buildHierarchy(node: any, imageUrls: Record<string, string>, openaiApiKey: string): Promise<any> {
+  const simplified: any = {
+    name: node.name || "이름 없음",
+    type: node.type,
+    characters: node.characters || "",
+    position: node.absoluteBoundingBox || null,
+    fills: node.fills || [],
+    strokes: node.strokes || [],
+    style: node.style || {},
+    effects: node.effects || [],
+  };
+  if (imageUrls[node.id]) {
+    simplified.image_url = imageUrls[node.id];
+    // OpenAI Vision API로 이미지 분석
+    try {
+      simplified.vision_text = await analyzeImageWithOpenAIVision(imageUrls[node.id], openaiApiKey);
+    } catch (e) {
+      simplified.vision_text = "이미지 분석 실패";
+    }
+  }
+  if (node.children) {
+    simplified["children"] = [];
+    for (const child of node.children) {
+      simplified["children"].push(await buildHierarchy(child, imageUrls, openaiApiKey));
+    }
+  }
+  return simplified;
 }
