@@ -1,7 +1,7 @@
 export async function analyzeImageWithOpenAIVision(imageUrl: string, openaiApiKey: string): Promise<string> {
   const apiUrl = "https://api.openai.com/v1/chat/completions";
   const body = {
-    model: "gpt-4-vision-preview",
+    model: "gpt-4o",
     messages: [
       {
         role: "user",
