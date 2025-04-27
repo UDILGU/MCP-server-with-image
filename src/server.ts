@@ -103,7 +103,7 @@ export class FigmaMcpServer {
 
     app.post("/context", async (req: Request, res: Response) => {
       try {
-        const { figma_url, access_token, openai_api_key } = req.body;
+        const { figma_url, access_token } = req.body;
 
         function extractFileKey(url: string): string | null {
           const match = url.match(/\/(?:file|design)\/([a-zA-Z0-9]+)/);
@@ -121,6 +121,11 @@ export class FigmaMcpServer {
 
         if (!fileKey || !nodeId) {
           return res.status(400).json({ error: "Invalid Figma URL" });
+        }
+
+        const openaiApiKey = process.env.OPEN_API_KEY;
+        if (!openaiApiKey) {
+          return res.status(500).json({ error: "OpenAI API key is not set in environment variables." });
         }
 
         const options = {
@@ -194,7 +199,7 @@ export class FigmaMcpServer {
           `텍스트는 '${targetText.substring(0, 30)}...'이며, 시각 강조 스타일은 ${node?.style ? JSON.stringify(node.style) : "없음"}입니다.`;
 
         // 3. 계층 구조 생성 (이미지 URL 및 Vision 분석 포함)
-        const hierarchy = await buildHierarchy(node, imageUrls, openai_api_key);
+        const hierarchy = await buildHierarchy(node, imageUrls, openaiApiKey);
 
         res.json({
           name: node?.name || "이름 없음",
