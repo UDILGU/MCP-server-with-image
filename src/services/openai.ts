@@ -6,8 +6,8 @@ export async function analyzeImageWithOpenAIVision(imageUrl: string, openaiApiKe
       {
         role: "user",
         content: [
-          { type: "text", text: "이 이미지를 설명해줘. UI/UX, 텍스트, 버튼 등 시각적 요소를 중심으로." },
           { type: "image_url", image_url: { url: imageUrl } }
+          { type: "text", text: "Describe this image. Focus on UI/UX, text, buttons, and visual elements." },
         ]
       }
     ],
@@ -21,7 +21,7 @@ export async function analyzeImageWithOpenAIVision(imageUrl: string, openaiApiKe
     },
     body: JSON.stringify(body)
   });
-  if (!response.ok) throw new Error("OpenAI Vision API 호출 실패");
+  if (!response.ok) throw new Error("OpenAI Vision API call failed");
   const data = await response.json();
   return data.choices?.[0]?.message?.content || "";
 } 
