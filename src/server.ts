@@ -247,11 +247,12 @@ async function buildHierarchy(node: any, imageUrls: Record<string, string>, open
   };
   if (imageUrls[node.id]) {
     simplified.image_url = imageUrls[node.id];
-    // OpenAI Vision API로 이미지 분석
     try {
+      // Vision API 호출 및 결과 저장
       simplified.vision_text = await analyzeImageWithOpenAIVision(imageUrls[node.id], openaiApiKey);
     } catch (e) {
-      simplified.vision_text = "이미지 분석 실패";
+      // 에러 메시지도 계층구조에 포함
+      simplified.vision_text = "이미지 분석 실패: " + (e instanceof Error ? e.message : String(e));
     }
   }
   if (node.children) {
