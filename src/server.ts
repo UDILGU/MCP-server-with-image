@@ -240,6 +240,9 @@ export class FigmaMcpServer {
 }
 
 async function buildHierarchy(node: any, imageUrls: Record<string, string>, openaiApiKey: string): Promise<any> {
+  // isVisible 유틸 함수 import
+  const { isVisible } = require("./utils/common");
+
   const simplified: any = {
     name: node.name || "이름 없음",
     type: node.type,
@@ -261,8 +264,9 @@ async function buildHierarchy(node: any, imageUrls: Record<string, string>, open
     }
   }
   if (node.children) {
+    // visible: false인 오브젝트는 계층구조에서 제외
     simplified["children"] = [];
-    for (const child of node.children) {
+    for (const child of node.children.filter(isVisible)) {
       simplified["children"].push(await buildHierarchy(child, imageUrls, openaiApiKey));
     }
   }
