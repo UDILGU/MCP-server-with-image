@@ -200,7 +200,7 @@ export class FigmaMcpServer {
           imageUrls: Record<string, string>, 
           openaiApiKey: string,
           frameWidth?: number, // 프레임의 너비
-          isParentBackground: boolean = false // 부모가 Background인지 여부
+          parentPath: string[] = [] // 상위 노드들의 경로를 저장
         ): Promise<any> {
           const { isVisible } = require("./utils/common");
 
@@ -211,6 +211,9 @@ export class FigmaMcpServer {
 
           // 현재 노드가 Background(dimm)인지 판단
           const isCurrentNodeBackground = determineIfBackground(node, frameWidth);
+          
+          // 현재 노드의 경로 생성
+          const currentPath = [...parentPath, node.name || "이름 없음"];
 
           const simplified: any = {
             name: node.name || "이름 없음",
@@ -221,7 +224,7 @@ export class FigmaMcpServer {
             strokes: node.strokes || [],
             style: node.style || {},
             effects: node.effects || [],
-            isBackground: isCurrentNodeBackground || isParentBackground, // Background이면 true, 아니면 false
+            isBackground: isCurrentNodeBackground, // 현재 노드가 dimm 조건을 만족하면 true
           };
           
           if (imageUrls[node.id]) {
@@ -236,14 +239,14 @@ export class FigmaMcpServer {
           if (node.children) {
             simplified["children"] = [];
             for (const child of node.children.filter(isVisible)) {
-              // 하위 레이어 처리 시 현재 Background 상태 전달
+              // 하위 레이어 처리 시 현재까지의 경로 전달
               simplified["children"].push(
                 await buildHierarchy(
                   child, 
                   imageUrls, 
                   openaiApiKey,
                   frameWidth,
-                  isCurrentNodeBackground || isParentBackground // 현재나 부모가 Background면 하위에도 true 전달
+                  currentPath
                 )
               );
             }
