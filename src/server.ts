@@ -195,9 +195,23 @@ export class FigmaMcpServer {
 ` +
           `텍스트는 '${targetText.substring(0, 30)}...'이며, 시각 강조 스타일은 ${node?.style ? JSON.stringify(node.style) : "없음"}입니다.`;
 
-        const { isVisible } = require("./utils/common");
-        
-        async function buildHierarchy(node: any, imageUrls: Record<string, string>, openaiApiKey: string): Promise<any> {
+        async function buildHierarchy(
+          node: any, 
+          imageUrls: Record<string, string>, 
+          openaiApiKey: string,
+          frameWidth?: number, // 프레임의 너비
+          isParentBackground: boolean = false // 부모가 Background인지 여부
+        ): Promise<any> {
+          const { isVisible } = require("./utils/common");
+
+          // 최상위 호출인 경우 frame width 저장
+          if (frameWidth === undefined && node.absoluteBoundingBox) {
+            frameWidth = node.absoluteBoundingBox.width;
+          }
+
+          // 현재 노드가 Background(dimm)인지 판단
+          const isCurrentNodeBackground = determineIfBackground(node, frameWidth);
+
           const simplified: any = {
             name: node.name || "이름 없음",
             type: node.type,
@@ -207,6 +221,7 @@ export class FigmaMcpServer {
             strokes: node.strokes || [],
             style: node.style || {},
             effects: node.effects || [],
+            isBackground: isCurrentNodeBackground || isParentBackground, // Background이면 true, 아니면 false
           };
           
           if (imageUrls[node.id]) {
@@ -221,7 +236,16 @@ export class FigmaMcpServer {
           if (node.children) {
             simplified["children"] = [];
             for (const child of node.children.filter(isVisible)) {
-              simplified["children"].push(await buildHierarchy(child, imageUrls, openaiApiKey));
+              // 하위 레이어 처리 시 현재 Background 상태 전달
+              simplified["children"].push(
+                await buildHierarchy(
+                  child, 
+                  imageUrls, 
+                  openaiApiKey,
+                  frameWidth,
+                  isCurrentNodeBackground || isParentBackground // 현재나 부모가 Background면 하위에도 true 전달
+                )
+              );
             }
           }
           
