@@ -199,14 +199,13 @@ export class FigmaMcpServer {
           node: any, 
           imageUrls: Record<string, string>, 
           openaiApiKey: string,
-          frameWidth?: number, // 프레임의 너비
-          parentPath: string[] = [] // 상위 노드들의 경로를 저장
+          frameWidth?: number,
+          isDimmed: boolean = false // 상위에 딤드 오브젝트가 있는지 여부
         ): Promise<any> {
           const { isVisible } = require("./utils/common");
 
-          // 최상위 호출인 경우(즉, 링크로 전달받은 노드인 경우) frame width 저장
+          // 최상위 호출인 경우 frame width 저장
           if (frameWidth === undefined) {
-            // 현재 노드의 프레임 찾기
             const frame = findParentFrame(node);
             if (frame?.absoluteBoundingBox) {
               frameWidth = frame.absoluteBoundingBox.width;
@@ -219,8 +218,8 @@ export class FigmaMcpServer {
           // 현재 노드가 Background(dimm)인지 판단
           const isCurrentNodeBackground = determineIfBackground(node, frameWidth);
           
-          // 현재 노드의 경로 생성
-          const currentPath = [...parentPath, node.name || "이름 없음"];
+          // 현재 노드가 딤드이거나 상위에 딤드가 있으면 true
+          const isBackgroundOrUnderDimmed = isCurrentNodeBackground || isDimmed;
 
           const simplified: any = {
             name: node.name || "이름 없음",
@@ -231,7 +230,7 @@ export class FigmaMcpServer {
             strokes: node.strokes || [],
             style: node.style || {},
             effects: node.effects || [],
-            isBackground: isCurrentNodeBackground, // 현재 노드가 dimm 조건을 만족하면 true
+            isBackground: isBackgroundOrUnderDimmed, // 딤드이거나 딤드 아래 있으면 true
           };
           
           if (imageUrls[node.id]) {
@@ -246,14 +245,14 @@ export class FigmaMcpServer {
           if (node.children) {
             simplified["children"] = [];
             for (const child of node.children.filter(isVisible)) {
-              // 하위 레이어 처리 시 현재까지의 경로 전달
+              // 하위 노드로 현재 딤드 상태 전달
               simplified["children"].push(
                 await buildHierarchy(
                   child, 
                   imageUrls, 
                   openaiApiKey,
                   frameWidth,
-                  currentPath
+                  isBackgroundOrUnderDimmed // 현재 노드가 딤드이거나 상위에 딤드가 있으면 true 전달
                 )
               );
             }
