@@ -133,7 +133,7 @@ export class FigmaMcpServer {
           path: `/v1/files/${fileKey}/nodes?ids=${nodeId}`,
           method: 'GET',
           headers: {
-            'X-Figma-Token': access_token  // ✅ 사용자로부터 받은 토큰 사용
+            'X-Figma-Token': access_token
           }
         };
 
@@ -152,10 +152,7 @@ export class FigmaMcpServer {
           return res.status(404).json({ error: "Node not found in Figma response" });
         }
 
-        // 1. 이미지 포함 노드 ID 수집
         const imageNodeIds = findImageNodeIds(node);
-
-        // 2. Figma API로 실제 image_url 가져오기
         const imageUrls = await fetchImageUrls(fileKey, imageNodeIds, access_token);
 
         function findText(n: any): string[] {
@@ -198,7 +195,39 @@ export class FigmaMcpServer {
 ` +
           `텍스트는 '${targetText.substring(0, 30)}...'이며, 시각 강조 스타일은 ${node?.style ? JSON.stringify(node.style) : "없음"}입니다.`;
 
-        // 3. 계층 구조 생성 (이미지 URL 및 Vision 분석 포함)
+        const { isVisible } = require("./utils/common");
+        
+        async function buildHierarchy(node: any, imageUrls: Record<string, string>, openaiApiKey: string): Promise<any> {
+          const simplified: any = {
+            name: node.name || "이름 없음",
+            type: node.type,
+            characters: node.characters || "",
+            position: node.absoluteBoundingBox || null,
+            fills: node.fills || [],
+            strokes: node.strokes || [],
+            style: node.style || {},
+            effects: node.effects || [],
+          };
+          
+          if (imageUrls[node.id]) {
+            simplified.image_url = imageUrls[node.id];
+            try {
+              simplified.vision_text = await analyzeImageWithOpenAIVision(imageUrls[node.id], openaiApiKey);
+            } catch (e) {
+              simplified.vision_text = "이미지 분석 실패: " + (e instanceof Error ? e.message : String(e));
+            }
+          }
+          
+          if (node.children) {
+            simplified["children"] = [];
+            for (const child of node.children.filter(isVisible)) {
+              simplified["children"].push(await buildHierarchy(child, imageUrls, openaiApiKey));
+            }
+          }
+          
+          return simplified;
+        }
+
         const hierarchy = await buildHierarchy(node, imageUrls, openaiApiKey);
 
         res.json({
@@ -237,38 +266,4 @@ export class FigmaMcpServer {
       });
     });
   }
-}
-
-async function buildHierarchy(node: any, imageUrls: Record<string, string>, openaiApiKey: string): Promise<any> {
-  // isVisible 유틸 함수 import
-  const { isVisible } = require("./utils/common");
-
-  const simplified: any = {
-    name: node.name || "이름 없음",
-    type: node.type,
-    characters: node.characters || "",
-    position: node.absoluteBoundingBox || null,
-    fills: node.fills || [],
-    strokes: node.strokes || [],
-    style: node.style || {},
-    effects: node.effects || [],
-  };
-  if (imageUrls[node.id]) {
-    simplified.image_url = imageUrls[node.id];
-    try {
-      // Vision API 호출 및 결과 저장
-      simplified.vision_text = await analyzeImageWithOpenAIVision(imageUrls[node.id], openaiApiKey);
-    } catch (e) {
-      // 에러 메시지도 계층구조에 포함
-      simplified.vision_text = "이미지 분석 실패: " + (e instanceof Error ? e.message : String(e));
-    }
-  }
-  if (node.children) {
-    // visible: false인 오브젝트는 계층구조에서 제외
-    simplified["children"] = [];
-    for (const child of node.children.filter(isVisible)) {
-      simplified["children"].push(await buildHierarchy(child, imageUrls, openaiApiKey));
-    }
-  }
-  return simplified;
 }
