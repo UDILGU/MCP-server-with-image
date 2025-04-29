@@ -267,3 +267,33 @@ export class FigmaMcpServer {
     });
   }
 }
+
+// Background 여부를 판단하는 함수
+function determineIfBackground(node: any, frameWidth?: number): boolean {
+  if (!node.absoluteBoundingBox || !frameWidth) {
+    return false;
+  }
+
+  const { width, height } = node.absoluteBoundingBox;
+  const opacity = node.opacity !== undefined ? node.opacity : 1;
+  const name = (node.name || "").toLowerCase(); // 대소문자 구분 없이 검사
+
+  // 필수 조건 체크:
+  // 1. width가 화면(프레임)의 width와 동일
+  // 2. 높이가 100픽셀 이상
+  const isWidthMatch = Math.abs(width - frameWidth) < 1; // 소수점 오차 허용
+  const isHeightSufficient = height >= 100;
+
+  // 필수 조건이 충족되지 않으면 바로 false 반환
+  if (!isWidthMatch || !isHeightSufficient) {
+    return false;
+  }
+
+  // 추가 조건 체크 (둘 중 하나만 만족하면 됨):
+  // 1. opacity가 60% 이하
+  // 2. 이름에 'dimm' 포함
+  const isOpacityLow = opacity <= 0.6;
+  const hasDimmInName = name.includes('dimm');
+
+  return isOpacityLow || hasDimmInName;
+}
