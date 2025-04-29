@@ -306,13 +306,13 @@ function determineIfBackground(node: any, frameWidth?: number): boolean {
   const name = (node.name || "").toLowerCase(); // 대소문자 구분 없이 검사
 
   // 필수 조건 체크:
-  // 1. width가 화면(프레임)의 width와 동일
+  // 1. width가 화면(프레임)의 width보다 크거나 같음
   // 2. 높이가 100픽셀 이상
-  const isWidthMatch = Math.abs(width - frameWidth) < 1; // 소수점 오차 허용
+  const isWidthSufficient = width >= frameWidth;
   const isHeightSufficient = height >= 100;
 
   // 필수 조건이 충족되지 않으면 바로 false 반환
-  if (!isWidthMatch || !isHeightSufficient) {
+  if (!isWidthSufficient || !isHeightSufficient) {
     return false;
   }
 
