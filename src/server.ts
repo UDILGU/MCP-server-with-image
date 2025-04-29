@@ -204,9 +204,16 @@ export class FigmaMcpServer {
         ): Promise<any> {
           const { isVisible } = require("./utils/common");
 
-          // 최상위 호출인 경우 frame width 저장
-          if (frameWidth === undefined && node.absoluteBoundingBox) {
-            frameWidth = node.absoluteBoundingBox.width;
+          // 최상위 호출인 경우(즉, 링크로 전달받은 노드인 경우) frame width 저장
+          if (frameWidth === undefined) {
+            // 현재 노드의 프레임 찾기
+            const frame = findParentFrame(node);
+            if (frame?.absoluteBoundingBox) {
+              frameWidth = frame.absoluteBoundingBox.width;
+              console.log(`\n[프레임 정보]
+              - 프레임 이름: ${frame.name}
+              - 프레임 width: ${frameWidth}px\n`);
+            }
           }
 
           // 현재 노드가 Background(dimm)인지 판단
@@ -295,17 +302,27 @@ export class FigmaMcpServer {
   }
 }
 
+// 현재 노드가 속한 프레임을 찾는 함수
+function findParentFrame(node: any): any {
+  // 자신이 프레임이면 반환
+  if (node.type === "FRAME") {
+    return node;
+  }
+
+  // 부모가 없으면 null 반환
+  if (!node.parent) {
+    return null;
+  }
+
+  // 부모로 올라가면서 프레임 찾기
+  return findParentFrame(node.parent);
+}
+
 // Background 여부를 판단하는 함수
 function determineIfBackground(node: any, frameWidth?: number): boolean {
-  // 1. 함수 진입 로그
-  console.log("\n[Background 검사 시작] --------------------------------");
-  
   if (!node.absoluteBoundingBox || !frameWidth) {
     return false;
   }
-
-  // 2. 프레임 width 로그
-  console.log(`🔍 프레임 width: ${frameWidth}px`);
 
   const { width, height } = node.absoluteBoundingBox;
   const opacity = node.opacity !== undefined ? node.opacity : 1;
@@ -324,7 +341,7 @@ function determineIfBackground(node: any, frameWidth?: number): boolean {
   const isOpacityLow = opacity <= 0.6;
   const hasDimmInName = name.includes('dimm');
 
-  // 3. 딤드 오브젝트 발견 시에만 로그 출력
+  // 딤드 오브젝트 발견 시에만 로그 출력
   if (isOpacityLow || hasDimmInName) {
     console.log(`✅ 딤드 오브젝트 발견!
     - 이름: ${name}
@@ -335,7 +352,6 @@ function determineIfBackground(node: any, frameWidth?: number): boolean {
       * Height 충분: ${isHeightSufficient ? '✓' : '✗'} (${height}px >= 100px)
       * Opacity 60% 이하: ${isOpacityLow ? '✓' : '✗'} (${opacity * 100}%)
       * 이름에 'dimm' 포함: ${hasDimmInName ? '✓' : '✗'}`);
-    console.log("[Background 검사 종료] --------------------------------\n");
   }
 
   return isOpacityLow || hasDimmInName;
