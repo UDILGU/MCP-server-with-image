@@ -297,17 +297,21 @@ export class FigmaMcpServer {
 
 // Background 여부를 판단하는 함수
 function determineIfBackground(node: any, frameWidth?: number): boolean {
+  // 1. 함수 진입 로그
+  console.log("\n[Background 검사 시작] --------------------------------");
+  
   if (!node.absoluteBoundingBox || !frameWidth) {
     return false;
   }
 
+  // 2. 프레임 width 로그
+  console.log(`🔍 프레임 width: ${frameWidth}px`);
+
   const { width, height } = node.absoluteBoundingBox;
   const opacity = node.opacity !== undefined ? node.opacity : 1;
-  const name = (node.name || "").toLowerCase(); // 대소문자 구분 없이 검사
+  const name = (node.name || "").toLowerCase();
 
-  // 필수 조건 체크:
-  // 1. width가 화면(프레임)의 width보다 크거나 같음
-  // 2. 높이가 100픽셀 이상
+  // 필수 조건 체크
   const isWidthSufficient = width >= frameWidth;
   const isHeightSufficient = height >= 100;
 
@@ -316,11 +320,23 @@ function determineIfBackground(node: any, frameWidth?: number): boolean {
     return false;
   }
 
-  // 추가 조건 체크 (둘 중 하나만 만족하면 됨):
-  // 1. opacity가 60% 이하
-  // 2. 이름에 'dimm' 포함
+  // 추가 조건 체크
   const isOpacityLow = opacity <= 0.6;
   const hasDimmInName = name.includes('dimm');
+
+  // 3. 딤드 오브젝트 발견 시에만 로그 출력
+  if (isOpacityLow || hasDimmInName) {
+    console.log(`✅ 딤드 오브젝트 발견!
+    - 이름: ${name}
+    - Width: ${width}px
+    - Opacity: ${opacity * 100}%
+    - 조건 만족:
+      * Width 충분: ${isWidthSufficient ? '✓' : '✗'} (${width}px >= ${frameWidth}px)
+      * Height 충분: ${isHeightSufficient ? '✓' : '✗'} (${height}px >= 100px)
+      * Opacity 60% 이하: ${isOpacityLow ? '✓' : '✗'} (${opacity * 100}%)
+      * 이름에 'dimm' 포함: ${hasDimmInName ? '✓' : '✗'}`);
+    console.log("[Background 검사 종료] --------------------------------\n");
+  }
 
   return isOpacityLow || hasDimmInName;
 }
