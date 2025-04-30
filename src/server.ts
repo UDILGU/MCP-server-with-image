@@ -200,7 +200,7 @@ export class FigmaMcpServer {
           imageUrls: Record<string, string>, 
           openaiApiKey: string,
           frameWidth?: number,
-          foundDimmIndex: number = -1 
+          foundDimmerLayer: boolean = false // dimmer 레이어를 위에서 발견했는지 여부
         ): Promise<any> {
           const { isVisible } = require("./utils/common");
 
@@ -215,16 +215,20 @@ export class FigmaMcpServer {
             }
           }
 
-          // 현재 노드가 Background(dimm)인지 판단
-          const isCurrentNodeBackground = determineIfBackground(node, frameWidth);
+          // 현재 노드가 dimmer인지 판단
+          const isCurrentNodeDimmer = determineIfBackground(node, frameWidth);
           
           // isBackground 값 결정
           let backgroundState = 'visible'; // 기본값: 정상 노출
           
-          if (isCurrentNodeBackground) {
+          if (isCurrentNodeDimmer) {
             backgroundState = 'dimmer'; // dimm을 발생시키는 오브젝트
-          } else if (foundDimmIndex !== -1 && 
-                     node.children?.length - 1 - node.children.indexOf(node) > foundDimmIndex) {
+            // dimmer 발견 시 로그
+            console.log(`✅ Dimmer 오브젝트 발견!
+            - 이름: ${node.name}
+            - Width: ${node.absoluteBoundingBox?.width}px
+            - Opacity: ${(node.opacity !== undefined ? node.opacity : 1) * 100}%`);
+          } else if (foundDimmerLayer) {
             backgroundState = 'dimmed'; // dimm에 의해 가려진 오브젝트
           }
 
@@ -251,17 +255,21 @@ export class FigmaMcpServer {
           
           if (node.children) {
             simplified["children"] = [];
-            for (const child of node.children.filter(isVisible)) {
-              // 하위 레이어로 현재 dimm 상태 전달
-              simplified["children"].push(
-                await buildHierarchy(
-                  child, 
-                  imageUrls, 
-                  openaiApiKey,
-                  frameWidth,
-                  isCurrentNodeBackground ? -1 : foundDimmIndex
-                )
+            // children을 역순으로 처리 (Figma의 레이어 순서대로)
+            for (let i = node.children.length - 1; i >= 0; i--) {
+              const child = node.children[i];
+              if (!isVisible(child)) continue;
+
+              // 현재 노드가 dimmer이거나 위에서 dimmer를 발견했으면 하위 노드들은 모두 dimmed
+              const childResult = await buildHierarchy(
+                child,
+                imageUrls,
+                openaiApiKey,
+                frameWidth,
+                isCurrentNodeDimmer || foundDimmerLayer
               );
+              
+              simplified["children"].unshift(childResult); // 원래 순서 유지를 위해 unshift 사용
             }
           }
           
