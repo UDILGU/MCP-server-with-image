@@ -200,7 +200,7 @@ export class FigmaMcpServer {
           imageUrls: Record<string, string>, 
           openaiApiKey: string,
           frameWidth?: number,
-          foundDimm: boolean = false // dimm 오브젝트를 위에서 발견했는지 여부
+          foundDimmIndex: number = -1 
         ): Promise<any> {
           const { isVisible } = require("./utils/common");
 
@@ -218,11 +218,15 @@ export class FigmaMcpServer {
           // 현재 노드가 Background(dimm)인지 판단
           const isCurrentNodeBackground = determineIfBackground(node, frameWidth);
           
-          // isBackground 값 결정:
-          // - 현재 노드가 dimm이면 '0'
-          // - 상위에서 dimm을 발견했으면 '-1' (가려진 상태)
-          // - 그 외의 경우 '1' (정상 노출)
-          const backgroundState = isCurrentNodeBackground ? '0' : (foundDimm ? '-1' : '1');
+          // isBackground 값 결정
+          let backgroundState = 'visible'; // 기본값: 정상 노출
+          
+          if (isCurrentNodeBackground) {
+            backgroundState = 'dimmer'; // dimm을 발생시키는 오브젝트
+          } else if (foundDimmIndex !== -1 && 
+                     node.children?.length - 1 - node.children.indexOf(node) > foundDimmIndex) {
+            backgroundState = 'dimmed'; // dimm에 의해 가려진 오브젝트
+          }
 
           const simplified: any = {
             name: node.name || "이름 없음",
@@ -255,7 +259,7 @@ export class FigmaMcpServer {
                   imageUrls, 
                   openaiApiKey,
                   frameWidth,
-                  isCurrentNodeBackground || foundDimm // 현재가 dimm이거나 위에서 dimm을 발견했으면 true 전달
+                  isCurrentNodeBackground ? -1 : foundDimmIndex
                 )
               );
             }
