@@ -200,7 +200,7 @@ export class FigmaMcpServer {
           imageUrls: Record<string, string>, 
           openaiApiKey: string,
           frameWidth?: number,
-          foundDimmerLayer: boolean = false // dimmer 레이어를 위에서 발견했는지 여부
+          dimmerFound: boolean = false // 이전에 dimmer를 발견했는지 여부
         ): Promise<any> {
           const { isVisible } = require("./utils/common");
 
@@ -217,19 +217,52 @@ export class FigmaMcpServer {
 
           // 현재 노드가 dimmer인지 판단
           const isCurrentNodeDimmer = determineIfBackground(node, frameWidth);
-          
-          // isBackground 값 결정
-          let backgroundState = 'visible'; // 기본값: 정상 노출
+
+          // children 먼저 처리 (레이어 순서대로)
+          let children: any[] = [];
+          let hasDimmerInChildren = false;
+
+          if (node.children) {
+            // 정방향으로 처리 (인덱스 0이 가장 아래 레이어)
+            for (let i = 0; i < node.children.length; i++) {
+              const child = node.children[i];
+              if (!isVisible(child)) continue;
+
+              // 이전에 dimmer를 발견했거나, 현재까지 처리한 children에서 dimmer를 발견했으면
+              // 그 이후의 레이어들은 모두 dimmed
+              const childResult = await buildHierarchy(
+                child,
+                imageUrls,
+                openaiApiKey,
+                frameWidth,
+                dimmerFound || hasDimmerInChildren
+              );
+
+              // child가 dimmer인지 체크하고 표시
+              if (childResult.isBackground === 'dimmer') {
+                hasDimmerInChildren = true;
+              }
+
+              children.push(childResult);
+            }
+          }
+
+          // 현재 노드의 상태 결정
+          let backgroundState = 'visible';
           
           if (isCurrentNodeDimmer) {
-            backgroundState = 'dimmer'; // dimm을 발생시키는 오브젝트
-            // dimmer 발견 시 로그
+            backgroundState = 'dimmer';
             console.log(`✅ Dimmer 오브젝트 발견!
             - 이름: ${node.name}
             - Width: ${node.absoluteBoundingBox?.width}px
             - Opacity: ${(node.opacity !== undefined ? node.opacity : 1) * 100}%`);
-          } else if (foundDimmerLayer) {
-            backgroundState = 'dimmed'; // dimm에 의해 가려진 오브젝트
+          } else if (dimmerFound || hasDimmerInChildren) {
+            // 상위에서 dimmer를 발견했거나, children에서 dimmer를 발견했으면 dimmed
+            backgroundState = 'dimmed';
+            console.log(`🔍 Dimmed 오브젝트 설정:
+            - 이름: ${node.name}
+            - 상위 Dimmer 존재: ${dimmerFound}
+            - Children에서 Dimmer 발견: ${hasDimmerInChildren}`);
           }
 
           const simplified: any = {
@@ -252,25 +285,9 @@ export class FigmaMcpServer {
               simplified.vision_text = "이미지 분석 실패: " + (e instanceof Error ? e.message : String(e));
             }
           }
-          
-          if (node.children) {
-            simplified["children"] = [];
-            // children을 역순으로 처리 (Figma의 레이어 순서대로)
-            for (let i = node.children.length - 1; i >= 0; i--) {
-              const child = node.children[i];
-              if (!isVisible(child)) continue;
 
-              // 현재 노드가 dimmer이거나 위에서 dimmer를 발견했으면 하위 노드들은 모두 dimmed
-              const childResult = await buildHierarchy(
-                child,
-                imageUrls,
-                openaiApiKey,
-                frameWidth,
-                isCurrentNodeDimmer || foundDimmerLayer
-              );
-              
-              simplified["children"].unshift(childResult); // 원래 순서 유지를 위해 unshift 사용
-            }
+          if (children.length > 0) {
+            simplified["children"] = children;
           }
           
           return simplified;
